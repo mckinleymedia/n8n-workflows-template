@@ -1,0 +1,49 @@
+{
+  "name": "Pets - Config",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get configuration from environment variables with defaults\nreturn [{\n  json: {\n    project_name: 'Pets Gallery',\n    cat_api_url: $env.PETS_CAT_API_URL || 'https://api.thecatapi.com/v1/images/search',\n    dog_api_url: $env.PETS_DOG_API_URL || 'https://api.thedogapi.com/v1/images/search',\n    cat_breed_url: $env.PETS_CAT_BREED_URL || 'https://api.thecatapi.com/v1/breeds',\n    dog_breed_url: $env.PETS_DOG_BREED_URL || 'https://api.thedogapi.com/v1/breeds',\n    gallery_title: $env.PETS_GALLERY_TITLE || '🐾 Pet Gallery 🐾',\n    webhook_path: $env.PETS_WEBHOOK_PATH || 'pets',\n    images_per_type: parseInt($env.PETS_IMAGES_PER_TYPE) || 5,\n    cache_duration_hours: parseInt($env.PETS_CACHE_DURATION_HOURS) || 6,\n    max_retries: 3,\n    include_breeds: $env.PETS_INCLUDE_BREEDS === 'true' || ($env.PETS_INCLUDE_BREEDS === undefined ? true : false),\n    enable_caching: true,\n    send_notifications: false\n  }\n}];"
+      },
+      "id": "set-config",
+      "name": "Set Configuration",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "pets-config"
+  },
+  "id": "pets-config"
+}

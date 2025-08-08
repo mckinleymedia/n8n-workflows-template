@@ -1,0 +1,296 @@
+{
+  "name": "Pets - Main",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 */6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [250, 150]
+    },
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "pets",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 450],
+      "webhookId": "pets-webhook"
+    },
+    {
+      "parameters": {},
+      "id": "merge-triggers",
+      "name": "Merge Triggers",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $env.PETS_CONFIG_WORKFLOW_ID || 'pets-config' }}"
+      },
+      "id": "execute-config",
+      "name": "Execute Config",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Execute Config').first().json.cat_api_url }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "={{ $('Execute Config').first().json.images_per_type }}"
+            },
+            {
+              "name": "has_breeds",
+              "value": "={{ $('Execute Config').first().json.include_breeds ? 1 : 0 }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-cats",
+      "name": "Fetch Cats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Execute Config').first().json.dog_api_url }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "={{ $('Execute Config').first().json.images_per_type }}"
+            },
+            {
+              "name": "has_breeds",
+              "value": "={{ $('Execute Config').first().json.include_breeds ? 1 : 0 }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fetch-dogs",
+      "name": "Fetch Dogs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 400]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "merge-pets",
+      "name": "Merge Pets",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all input items (cats and dogs merged)\nconst allItems = $input.all();\n\n// Separate cats and dogs based on the URL\nconst cats = allItems.filter(item => item.json.url && item.json.url.includes('cat'));\nconst dogs = allItems.filter(item => item.json.url && item.json.url.includes('dog'));\n\n// Process cat data\nconst catData = cats.map((item, index) => ({\n  type: 'cat',\n  url: item.json.url,\n  id: item.json.id,\n  index: index + 1,\n  breeds: item.json.breeds || [],\n  width: item.json.width,\n  height: item.json.height\n}));\n\n// Process dog data\nconst dogData = dogs.map((item, index) => ({\n  type: 'dog',\n  url: item.json.url,\n  id: item.json.id,\n  index: index + 1,\n  breeds: item.json.breeds || [],\n  width: item.json.width,\n  height: item.json.height\n}));\n\n// Combine all data\nconst allPets = [...catData, ...dogData];\n\n// Add metadata\nconst result = {\n  timestamp: new Date().toISOString(),\n  stats: {\n    total_pets: allPets.length,\n    cats: catData.length,\n    dogs: dogData.length,\n    with_breeds: allPets.filter(p => p.breeds.length > 0).length\n  },\n  pets: allPets\n};\n\n// Return items for processing\nreturn allPets.map(pet => ({\n  json: {\n    ...pet,\n    metadata: result\n  }\n}));"
+      },
+      "id": "process-data",
+      "name": "Process Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1500, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "download-images",
+      "name": "Download Images",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1750, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 200,
+        "responseHeaders": {
+          "entries": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Downloaded ' + $input.all().length + ' pet images', stats: $input.first().json.metadata.stats, timestamp: new Date().toISOString() }) }}",
+        "options": {}
+      },
+      "id": "webhook-response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2000, 300]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Merge Triggers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Merge Triggers",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Merge Triggers",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge Triggers": {
+      "main": [
+        [
+          {
+            "node": "Execute Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Config": {
+      "main": [
+        [
+          {
+            "node": "Fetch Cats",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Dogs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Cats": {
+      "main": [
+        [
+          {
+            "node": "Merge Pets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Dogs": {
+      "main": [
+        [
+          {
+            "node": "Merge Pets",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Pets": {
+      "main": [
+        [
+          {
+            "node": "Process Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Data": {
+      "main": [
+        [
+          {
+            "node": "Download Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Images": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "meta": {
+    "instanceId": "pets-main"
+  },
+  "id": "pets-main"
+}
