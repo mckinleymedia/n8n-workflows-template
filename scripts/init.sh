@@ -78,6 +78,15 @@ else
     exit 1
 fi
 
+# Create n8n_data directory if it doesn't exist
+if [ ! -d "n8n_data" ]; then
+    echo -e "${BLUE}Creating n8n_data directory for persistent storage...${NC}"
+    mkdir -p n8n_data
+    echo -e "${GREEN}✓ Created n8n_data directory${NC}"
+else
+    echo -e "${GREEN}✓ n8n_data directory already exists${NC}"
+fi
+
 # Check if n8n is already running
 if $CONTAINER_RUNTIME ps 2>/dev/null | grep -q n8n; then
     echo -e "${GREEN}✓ n8n is already running${NC}"
@@ -117,11 +126,13 @@ else
                 $CONTAINER_RUNTIME start n8n
             else
                 echo "Creating new n8n container..."
+                # Create n8n_data directory if not using compose
+                mkdir -p n8n_data
                 # Podman and nerdctl are Docker-compatible for basic commands
                 $CONTAINER_RUNTIME run -d \
                     --name n8n \
                     -p 5678:5678 \
-                    -v n8n_data:/home/node/.n8n \
+                    -v "$(pwd)/n8n_data:/home/node/.n8n" \
                     -e N8N_BASIC_AUTH_ACTIVE=false \
                     n8nio/n8n
             fi

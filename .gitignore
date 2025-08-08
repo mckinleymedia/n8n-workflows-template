@@ -51,4 +51,6 @@ __pycache__/
 
 # Docker
 docker-compose.override.yml
+
+# n8n data persistence
 n8n_data/
